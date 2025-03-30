@@ -227,6 +227,13 @@ class UsbConnectionManager {
       _getAvailableDevices();
     });
   }
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
 
   Future<void> _getAvailableDevices() async {
     List<UsbDevice> devices = await UsbSerial.listDevices();
@@ -298,22 +305,22 @@ class UsbConnectionManager {
     if (existingIndex >= 0) {
       vehicleInformation[existingIndex] = {
         'id': vehicleId,
-        'latitude': data['remote_latitude'],
-        'longitude': data['remote_longitude'],
-        'speed': data['remote_speed'],
-        'status': data['remote_status'],
-        'lastReceivedTime': data['remote_time'],
-        'mac': data['remote_mac'],
+        'latitude': _toDouble(data['remote_latitude']),
+        'longitude': _toDouble(data['remote_longitude']),
+        'speed': _toDouble(data['remote_speed']),
+        'status': data['remote_status']?.toString(),
+        'lastReceivedTime': data['remote_time']?.toString(),
+        'mac': data['remote_mac']?.toString(),
       };
     } else {
       vehicleInformation.add({
         'id': vehicleId,
-        'latitude': data['remote_latitude'],
-        'longitude': data['remote_longitude'],
-        'speed': data['remote_speed'],
-        'status': data['remote_status'],
-        'lastReceivedTime': data['remote_time'],
-        'mac': data['remote_mac'],
+        'latitude': _toDouble(data['remote_latitude']),
+        'longitude': _toDouble(data['remote_longitude']),
+        'speed': _toDouble(data['remote_speed']),
+        'status': data['remote_status']?.toString(),
+        'lastReceivedTime': data['remote_time']?.toString(),
+        'mac': data['remote_mac']?.toString(),
       });
     }
     _vehiclesController.add(vehicleInformation);
@@ -321,11 +328,11 @@ class UsbConnectionManager {
 
   void _updateSelfVehicleInformation(Map<String, dynamic> data) {
     selfVehicle = {
-      'latitude': data['self_latitude'] ?? selfVehicle['latitude'],
-      'longitude': data['self_longitude'] ?? selfVehicle['longitude'],
-      'speed': data['self_speed'] ?? selfVehicle['speed'],
-      'vehicle': data['self_vehicle'] ?? selfVehicle['vehicle'],
-      'time': data['self_time'] ?? selfVehicle['time'],
+      'latitude': _toDouble(data['self_latitude']) ?? selfVehicle['latitude'],
+      'longitude': _toDouble(data['self_longitude']) ?? selfVehicle['longitude'],
+      'speed': _toDouble(data['self_speed']) ?? selfVehicle['speed'],
+      'vehicle': data['self_vehicle']?.toString() ?? selfVehicle['vehicle'],
+      'time': data['self_time']?.toString() ?? selfVehicle['time'],
       'status': _status == "Disconnected" ? 'Disconnected' : 'Connected',
     };
     _selfVehicleController.add(selfVehicle);
@@ -649,6 +656,7 @@ class RadarView extends StatelessWidget {
         ),
         child: Stack(
           children: [
+            // Radar circles
             ...List.generate(3, (index) {
               final radius = (index + 1) * 50.0;
               return Positioned(
@@ -665,6 +673,8 @@ class RadarView extends StatelessWidget {
                 ),
               );
             }),
+
+            // Radar cross lines
             Container(
               decoration: BoxDecoration(
                 border: Border(
@@ -673,26 +683,38 @@ class RadarView extends StatelessWidget {
                 ),
               ),
             ),
+
+            // Vehicle indicators
             ...vehicles.map((vehicle) {
-              if (vehicle['latitude'] == null || vehicle['longitude'] == null) {
+              final vehicleLat = _toDouble(vehicle['latitude']);
+              final vehicleLon = _toDouble(vehicle['longitude']);
+              final selfLat = _toDouble(selfLatitude) ?? 0;
+              final selfLon = _toDouble(selfLongitude) ?? 0;
+
+              if (vehicleLat == null || vehicleLon == null ||
+                  vehicleLat == 0 || vehicleLon == 0 ||
+                  selfLat == 0 || selfLon == 0) {
                 return SizedBox.shrink();
               }
 
               final distance = calculateHaversine(
-                selfLatitude,
-                selfLongitude,
-                vehicle['latitude'],
-                vehicle['longitude'],
+                selfLat,
+                selfLon,
+                vehicleLat,
+                vehicleLon,
               );
 
               final angle = calculateAngle(
-                selfLatitude,
-                selfLongitude,
-                vehicle['latitude'],
-                vehicle['longitude'],
+                selfLat,
+                selfLon,
+                vehicleLat,
+                vehicleLon,
               );
 
+              // Scale distance to fit in radar (max 150m shown)
               final scaledDistance = min(distance, 150) / 150 * 100;
+
+              // Convert polar to cartesian coordinates
               final radian = angle * pi / 180;
               final x = 100 + scaledDistance * cos(radian);
               final y = 100 + scaledDistance * sin(radian);
@@ -705,17 +727,19 @@ class RadarView extends StatelessWidget {
                   height: 16,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _getStatusColor(vehicle['status']),
+                    color: _getStatusColor(vehicle['status']?.toString() ?? ''),
                   ),
                   child: Center(
                     child: Text(
-                      vehicle['id'].toString().substring(0, 1),
+                      vehicle['id']?.toString().substring(0, 1) ?? '?',
                       style: TextStyle(color: Colors.white, fontSize: 10),
                     ),
                   ),
                 ),
               );
             }).toList(),
+
+            // Center indicator (self vehicle)
             Positioned(
               left: 95,
               top: 95,
@@ -734,6 +758,15 @@ class RadarView extends StatelessWidget {
     );
   }
 
+  // Helper method to safely convert to double
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'connected': return Colors.green;
@@ -744,10 +777,9 @@ class RadarView extends StatelessWidget {
   }
 }
 
+// Haversine distance calculation in meters
 double calculateHaversine(double lat1, double lon1, double lat2, double lon2) {
-  if (lat1 == -1 || lon1 == -1 || lat2 == null || lon2 == null) return 0;
-
-  const R = 6371000;
+  const R = 6371000; // Earth radius in meters
   final phi1 = lat1 * pi / 180;
   final phi2 = lat2 * pi / 180;
   final deltaPhi = (lat2 - lat1) * pi / 180;
@@ -761,9 +793,8 @@ double calculateHaversine(double lat1, double lon1, double lat2, double lon2) {
   return R * c;
 }
 
+// Calculate angle in degrees (0-360) from self to target
 double calculateAngle(double lat1, double lon1, double lat2, double lon2) {
-  if (lat1 == -1 || lon1 == -1 || lat2 == null || lon2 == null) return 0;
-
   final deltaLon = (lon2 - lon1) * pi / 180;
   final lat1Rad = lat1 * pi / 180;
   final lat2Rad = lat2 * pi / 180;
@@ -773,5 +804,5 @@ double calculateAngle(double lat1, double lon1, double lat2, double lon2) {
       sin(lat1Rad) * cos(lat2Rad) * cos(deltaLon);
 
   var angle = atan2(y, x) * 180 / pi;
-  return (angle + 360) % 360;
+  return (angle + 360) % 360; // Normalize to 0-360
 }
