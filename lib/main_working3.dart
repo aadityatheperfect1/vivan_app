@@ -125,12 +125,20 @@ class UsbConnectionManager {
   void init() {
     _getAvailableDevices();
     UsbSerial.usbEventStream?.listen((UsbEvent event) {
+      if (event.event == UsbEvent.ACTION_USB_DETACHED && _device != null) {
+        if (event.device?.deviceId == _device?.deviceId) {
+          _disconnect();
+        }
+      }
       _getAvailableDevices();
     });
   }
 
   Future<void> _getAvailableDevices() async {
     List<UsbDevice> devices = await UsbSerial.listDevices();
+    if (_device != null && !devices.any((d) => d.deviceId == _device?.deviceId)) {
+      await _disconnect();
+    }
     _availableDevices = devices;
     _statusController.add(_status);
   }
@@ -167,6 +175,8 @@ class UsbConnectionManager {
 
       transaction.stream.listen((String line) {
         _processSerialData(line);
+      }, onDone: () {
+        _disconnect();
       });
 
       _status = "Connected to ${device.productName ?? 'device'}";
@@ -183,10 +193,7 @@ class UsbConnectionManager {
     try {
       final dynamic decoded = jsonDecode(line);
       if (decoded is Map<String, dynamic> && decoded['type'] == "Packet") {
-        // Update remote vehicle information
         _updateVehicleInformation(decoded);
-
-        // Update self vehicle information
         _updateSelfVehicleInformation(decoded);
       }
     } catch (e) {
@@ -220,7 +227,6 @@ class UsbConnectionManager {
         'mac': data['remote_mac'],
       });
     }
-
     _vehiclesController.add(vehicleInformation);
   }
 
@@ -299,7 +305,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Connection Status Card
         Card(
           child: Padding(
             padding: const EdgeInsets.all(12.0),
@@ -412,7 +417,6 @@ class _HomePageState extends State<HomePage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Nearby Vehicles Section
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16.0, vertical: 8.0),
@@ -432,7 +436,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
 
-                  // Nearby Vehicles List
                   if (vehicleInformation.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(16.0),
