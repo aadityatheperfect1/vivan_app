@@ -133,6 +133,16 @@ class DevelopersPage extends StatelessWidget {
   }
 }
 
+
+class VoiceChat extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text('Voice Chat Page', style: TextStyle(fontSize: 24)),
+    );
+  }
+}
+
 class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -173,6 +183,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         index: _currentIndex,
         children: [
           HomePage(connectionManager: _connectionManager),
+          VoiceChat(),
           SelfVehiclePage(connectionManager: _connectionManager),
           DevelopersPage(),
           SettingsPage(),
@@ -184,6 +195,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.local_phone), label: 'Voice Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Self Vehicle'),
           BottomNavigationBarItem(icon: Icon(Icons.code), label: 'Developers'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
@@ -496,14 +508,18 @@ class _HomePageState extends State<HomePage> {
                   else
                     ...vehicleInformation.map((vehicle) {
                       final distance = calculateHaversine(
-                        selfVehicle['latitude'],
-                        selfVehicle['longitude'],
+                        8.6279986,
+                        // selfVehicle['latitude'],
+                        77.0339556,
+                        // selfVehicle['longitude'],
                         vehicle['latitude'],
                         vehicle['longitude'],
                       );
                       final angle = calculateAngle(
-                        selfVehicle['latitude'],
-                        selfVehicle['longitude'],
+                        8.6279986,
+                        // selfVehicle['latitude'],
+                        77.0339556,
+                        // selfVehicle['longitude'],
                         vehicle['latitude'],
                         vehicle['longitude'],
                       );
@@ -698,15 +714,19 @@ class RadarView extends StatelessWidget {
               }
 
               final distance = calculateHaversine(
-                selfLat,
-                selfLon,
+                8.6279986,
+                // selfLat,
+                77.0339556,
+                // selfLon
                 vehicleLat,
                 vehicleLon,
               );
 
               final angle = calculateAngle(
-                selfLat,
-                selfLon,
+                8.6279986,
+                // selfLat,
+                77.0339556,
+                // selfLon
                 vehicleLat,
                 vehicleLon,
               );
