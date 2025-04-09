@@ -181,14 +181,55 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   int _currentIndex = 0;
   final UsbConnectionManager _connectionManager = UsbConnectionManager();
 
+  late StreamSubscription<Map<String, dynamic>> _requestSubscription;
+
   @override
   void initState() {
     super.initState();
     _connectionManager.init();
+    _setupRequestListener();
   }
+
+  void _setupRequestListener() {
+    _requestSubscription = _connectionManager.requestStream.listen((request) {
+      _showConnectionRequestDialog(request);
+    });
+  }
+
+
+  void _showConnectionRequestDialog(Map<String, dynamic> request) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Connection Request'),
+        content: Text(
+          'Vehicle ${request['vehicle']} wants to connect with you!\n'
+              'MAC: ${request['mac']}',
+        ),
+        actions: [
+          TextButton(
+            child: Text('Reject'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: Text('Accept'),
+            onPressed: () {
+              // You can add logic here to handle the accepted connection
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Connection established!')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   void dispose() {
+    _requestSubscription.cancel();
     _connectionManager.dispose();
     super.dispose();
   }
@@ -264,6 +305,29 @@ class UsbConnectionManager {
       _vehiclesController.stream;
   Stream<Map<String, dynamic>> get selfVehicleStream =>
       _selfVehicleController.stream;
+
+  // Add this new stream controller for connection requests
+  final StreamController<Map<String, dynamic>> _requestController =
+  StreamController.broadcast();
+  Stream<Map<String, dynamic>> get requestStream => _requestController.stream;
+
+  void _processSerialData(String line) {
+    try {
+      final dynamic decoded = jsonDecode(line);
+
+      // Handle Packet type messages
+      if (decoded is Map<String, dynamic> && decoded['type'] == "Packet") {
+        _updateVehicleInformation(decoded);
+        _updateSelfVehicleInformation(decoded);
+      }
+      // Handle Request type messages
+      else if (decoded is Map<String, dynamic> && decoded['type'] == "Request") {
+        _requestController.add(decoded);
+      }
+    } catch (e) {
+      debugPrint("Error parsing data: $e");
+    }
+  }
 
   void init() {
     _getAvailableDevices();
@@ -344,17 +408,17 @@ class UsbConnectionManager {
     }
   }
 
-  void _processSerialData(String line) {
-    try {
-      final dynamic decoded = jsonDecode(line);
-      if (decoded is Map<String, dynamic> && decoded['type'] == "Packet") {
-        _updateVehicleInformation(decoded);
-        _updateSelfVehicleInformation(decoded);
-      }
-    } catch (e) {
-      debugPrint("Error parsing data: $e");
-    }
-  }
+  // void _processSerialData(String line) {
+  //   try {
+  //     final dynamic decoded = jsonDecode(line);
+  //     if (decoded is Map<String, dynamic> && decoded['type'] == "Packet") {
+  //       _updateVehicleInformation(decoded);
+  //       _updateSelfVehicleInformation(decoded);
+  //     }
+  //   } catch (e) {
+  //     debugPrint("Error parsing data: $e");
+  //   }
+  // }
 
   void _updateVehicleInformation(Map<String, dynamic> data) {
     final vehicleId = data['remote_vehicle']?.toString();
@@ -417,6 +481,7 @@ class UsbConnectionManager {
     _statusController.close();
     _vehiclesController.close();
     _selfVehicleController.close();
+    _requestController.close(); // Added new line
   }
 }
 
@@ -443,6 +508,33 @@ class _HomePageState extends State<HomePage> {
     'time': 'Time Unavailable',
     'status': 'Disconnected',
   };
+
+
+  // Add this new method to handle the connection initiation
+  // Updated method to send JSON-formatted request
+  void _initiateConnection(Map<String, dynamic> vehicle) {
+    if (widget.connectionManager?._port == null) return;
+
+    try {
+      final payload = {
+        "type": "Request",
+        "vehicle": vehicle['vehicle'] ?? vehicle['id'] ?? 'Unknown',
+        "mac": vehicle['mac'] ?? 'Unknown',
+        "timestamp": DateTime.now().millisecondsSinceEpoch,
+      };
+
+      final message = '${jsonEncode(payload)}\n';
+      widget.connectionManager?._port?.write(Uint8List.fromList(message.codeUnits));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Request sent to ${payload['vehicle']}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send request: ${e.toString()}')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -576,17 +668,13 @@ class _HomePageState extends State<HomePage> {
                     ...vehicleInformation.map((vehicle) {
                       final distance = calculateHaversine(
                         8.6279986,
-                        // selfVehicle['latitude'],
                         77.0339556,
-                        // selfVehicle['longitude'],
                         vehicle['latitude'],
                         vehicle['longitude'],
                       );
                       final angle = calculateAngle(
                         8.6279986,
-                        // selfVehicle['latitude'],
                         77.0339556,
-                        // selfVehicle['longitude'],
                         vehicle['latitude'],
                         vehicle['longitude'],
                       );
@@ -611,7 +699,7 @@ class _HomePageState extends State<HomePage> {
                                   SizedBox(width: 10),
                                   Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Vehicle ${vehicle['id']}',
@@ -656,6 +744,19 @@ class _HomePageState extends State<HomePage> {
                               ),
                               if (vehicle['mac'] != null)
                                 _buildInfoRow('MAC:', vehicle['mac']),
+
+                              // Add the new connection button here
+                              SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                icon: Icon(Icons.connect_without_contact, size: 16),
+                                label: Text('Initiate Connection'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue[700],
+                                  foregroundColor: Colors.white,
+                                  minimumSize: Size(double.infinity, 36),
+                                ),
+                                onPressed: () => _initiateConnection(vehicle),
+                              ),
                             ],
                           ),
                         ),
