@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:usb_serial/transaction.dart';
 import 'package:usb_serial/usb_serial.dart';
+import 'package:vivan_app/voicechat.dart';
 
 void main() => runApp(SerialMonitorApp());
 
@@ -45,9 +46,9 @@ class _SelfVehiclePageState extends State<SelfVehiclePage> {
   late StreamSubscription<Map<String, dynamic>> _selfVehicleSubscription;
   late StreamSubscription<String> _statusSubscription;
   Map<String, dynamic> selfVehicle = {
-    'latitude': -1,
-    'longitude': -1,
-    'speed': -1,
+    'latitude': -1.0,
+    'longitude': -1.0,
+    'speed': -1.0,
     'vehicle': 'Unknown',
     'time': 'Time Unavailable',
     'status': 'Disconnected',
@@ -56,11 +57,18 @@ class _SelfVehiclePageState extends State<SelfVehiclePage> {
   @override
   void initState() {
     super.initState();
-    _selfVehicleSubscription = widget.connectionManager!.selfVehicleStream.listen((vehicle) {
-      setState(() => selfVehicle = vehicle);
-    });
-    _statusSubscription = widget.connectionManager!.statusStream.listen((status) {
-      setState(() => selfVehicle['status'] = status == "Disconnected" ? 'Disconnected' : 'Connected');
+    _selfVehicleSubscription = widget.connectionManager!.selfVehicleStream
+        .listen((vehicle) {
+          setState(() => selfVehicle = vehicle);
+        });
+    _statusSubscription = widget.connectionManager!.statusStream.listen((
+      status,
+    ) {
+      setState(
+        () =>
+            selfVehicle['status'] =
+                status == "Disconnected" ? 'Disconnected' : 'Connected',
+      );
     });
   }
 
@@ -97,7 +105,11 @@ class _SelfVehiclePageState extends State<SelfVehiclePage> {
               ),
               Divider(),
               _buildInfoRow('ID:', selfVehicle['vehicle']),
-              _buildInfoRow('Status:', selfVehicle['status'], isGood: selfVehicle['status'] == 'Connected'),
+              _buildInfoRow(
+                'Status:',
+                selfVehicle['status'],
+                isGood: selfVehicle['status'] == 'Connected',
+              ),
               _buildInfoRow('Speed:', '${selfVehicle['speed']} km/h'),
               _buildInfoRow('Latitude:', '${selfVehicle['latitude']}'),
               _buildInfoRow('Longitude:', '${selfVehicle['longitude']}'),
@@ -115,9 +127,20 @@ class _SelfVehiclePageState extends State<SelfVehiclePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
           SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: isGood ? Colors.green : Colors.black))),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: isGood ? Colors.green : Colors.black),
+            ),
+          ),
         ],
       ),
     );
@@ -133,22 +156,19 @@ class DevelopersPage extends StatelessWidget {
   }
 }
 
-
-class VoiceChat extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text('Voice Chat Page', style: TextStyle(fontSize: 24)),
-    );
-  }
-}
+// class VoiceChat extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     return Center(
+//       child: Text('Voice Chat Page', style: TextStyle(fontSize: 24)),
+//     );
+//   }
+// }
 
 class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Settings Page', style: TextStyle(fontSize: 24)),
-    );
+    return Center(child: Text('Settings Page', style: TextStyle(fontSize: 24)));
   }
 }
 
@@ -177,7 +197,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VIVAN Serial Monitor', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'VIVAN Serial Monitor',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: IndexedStack(
         index: _currentIndex,
@@ -195,10 +218,19 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_phone), label: 'Voice Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Self Vehicle'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_phone),
+            label: 'Voice Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.directions_car),
+            label: 'Self Vehicle',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.code), label: 'Developers'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
     );
@@ -212,21 +244,26 @@ class UsbConnectionManager {
   List<UsbDevice> _availableDevices = [];
   List<Map<String, dynamic>> vehicleInformation = [];
   Map<String, dynamic> selfVehicle = {
-    'latitude': -1,
-    'longitude': -1,
-    'speed': -1,
+    'latitude': -1.0,
+    'longitude': -1.0,
+    'speed': -1.0,
     'vehicle': 'Unknown',
     'time': 'Time Unavailable',
     'status': 'Disconnected',
   };
 
-  final StreamController<String> _statusController = StreamController.broadcast();
-  final StreamController<List<Map<String, dynamic>>> _vehiclesController = StreamController.broadcast();
-  final StreamController<Map<String, dynamic>> _selfVehicleController = StreamController.broadcast();
+  final StreamController<String> _statusController =
+      StreamController.broadcast();
+  final StreamController<List<Map<String, dynamic>>> _vehiclesController =
+      StreamController.broadcast();
+  final StreamController<Map<String, dynamic>> _selfVehicleController =
+      StreamController.broadcast();
 
   Stream<String> get statusStream => _statusController.stream;
-  Stream<List<Map<String, dynamic>>> get vehiclesStream => _vehiclesController.stream;
-  Stream<Map<String, dynamic>> get selfVehicleStream => _selfVehicleController.stream;
+  Stream<List<Map<String, dynamic>>> get vehiclesStream =>
+      _vehiclesController.stream;
+  Stream<Map<String, dynamic>> get selfVehicleStream =>
+      _selfVehicleController.stream;
 
   void init() {
     _getAvailableDevices();
@@ -239,6 +276,7 @@ class UsbConnectionManager {
       _getAvailableDevices();
     });
   }
+
   double? _toDouble(dynamic value) {
     if (value == null) return null;
     if (value is double) return value;
@@ -249,7 +287,8 @@ class UsbConnectionManager {
 
   Future<void> _getAvailableDevices() async {
     List<UsbDevice> devices = await UsbSerial.listDevices();
-    if (_device != null && !devices.any((d) => d.deviceId == _device?.deviceId)) {
+    if (_device != null &&
+        !devices.any((d) => d.deviceId == _device?.deviceId)) {
       await _disconnect();
     }
     _availableDevices = devices;
@@ -274,18 +313,26 @@ class UsbConnectionManager {
       }
 
       _device = device;
-      await _port!.setPortParameters(115200, UsbPort.DATABITS_8, UsbPort.STOPBITS_1, UsbPort.PARITY_NONE);
+      await _port!.setPortParameters(
+        115200,
+        UsbPort.DATABITS_8,
+        UsbPort.STOPBITS_1,
+        UsbPort.PARITY_NONE,
+      );
 
       final transaction = Transaction.stringTerminated(
         _port!.inputStream!.asBroadcastStream(),
         Uint8List.fromList([13, 10]),
       );
 
-      transaction.stream.listen((String line) {
-        _processSerialData(line);
-      }, onDone: () {
-        _disconnect();
-      });
+      transaction.stream.listen(
+        (String line) {
+          _processSerialData(line);
+        },
+        onDone: () {
+          _disconnect();
+        },
+      );
 
       _status = "Connected to ${device.productName ?? 'device'}";
       selfVehicle['status'] = 'Connected';
@@ -313,7 +360,9 @@ class UsbConnectionManager {
     final vehicleId = data['remote_vehicle']?.toString();
     if (vehicleId == null) return;
 
-    final existingIndex = vehicleInformation.indexWhere((v) => v['id'] == vehicleId);
+    final existingIndex = vehicleInformation.indexWhere(
+      (v) => v['id'] == vehicleId,
+    );
     if (existingIndex >= 0) {
       vehicleInformation[existingIndex] = {
         'id': vehicleId,
@@ -341,7 +390,8 @@ class UsbConnectionManager {
   void _updateSelfVehicleInformation(Map<String, dynamic> data) {
     selfVehicle = {
       'latitude': _toDouble(data['self_latitude']) ?? selfVehicle['latitude'],
-      'longitude': _toDouble(data['self_longitude']) ?? selfVehicle['longitude'],
+      'longitude':
+          _toDouble(data['self_longitude']) ?? selfVehicle['longitude'],
       'speed': _toDouble(data['self_speed']) ?? selfVehicle['speed'],
       'vehicle': data['self_vehicle']?.toString() ?? selfVehicle['vehicle'],
       'time': data['self_time']?.toString() ?? selfVehicle['time'],
@@ -386,9 +436,9 @@ class _HomePageState extends State<HomePage> {
   String _status = "Disconnected";
   List<Map<String, dynamic>> vehicleInformation = [];
   Map<String, dynamic> selfVehicle = {
-    'latitude': -1,
-    'longitude': -1,
-    'speed': -1,
+    'latitude': -1.0,
+    'longitude': -1.0,
+    'speed': -1.0,
     'vehicle': 'Unknown',
     'time': 'Time Unavailable',
     'status': 'Disconnected',
@@ -397,9 +447,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _statusSubscription = widget.connectionManager!.statusStream.listen((status) => setState(() => _status = status));
-    _vehiclesSubscription = widget.connectionManager!.vehiclesStream.listen((vehicles) => setState(() => vehicleInformation = vehicles));
-    _selfVehicleSubscription = widget.connectionManager!.selfVehicleStream.listen((vehicle) => setState(() => selfVehicle = vehicle));
+    _statusSubscription = widget.connectionManager!.statusStream.listen(
+      (status) => setState(() => _status = status),
+    );
+    _vehiclesSubscription = widget.connectionManager!.vehiclesStream.listen(
+      (vehicles) => setState(() => vehicleInformation = vehicles),
+    );
+    _selfVehicleSubscription = widget.connectionManager!.selfVehicleStream
+        .listen((vehicle) => setState(() => selfVehicle = vehicle));
   }
 
   @override
@@ -437,9 +492,15 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(width: 8),
                     Flexible(
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: _status == "Disconnected" ? Colors.red : Colors.green,
+                          color:
+                              _status == "Disconnected"
+                                  ? Colors.red
+                                  : Colors.green,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -484,7 +545,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
                     child: Row(
                       children: [
                         Icon(Icons.group, color: Colors.indigo),
@@ -503,7 +567,10 @@ class _HomePageState extends State<HomePage> {
                   if (vehicleInformation.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text('No nearby vehicles detected', style: TextStyle(color: Colors.grey)),
+                      child: Text(
+                        'No nearby vehicles detected',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     )
                   else
                     ...vehicleInformation.map((vehicle) {
@@ -525,7 +592,10 @@ class _HomePageState extends State<HomePage> {
                       );
 
                       return Card(
-                        margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                        margin: EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 4.0,
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -533,19 +603,29 @@ class _HomePageState extends State<HomePage> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.directions_car, color: Colors.indigo, size: 30),
+                                  Icon(
+                                    Icons.directions_car,
+                                    color: Colors.indigo,
+                                    size: 30,
+                                  ),
                                   SizedBox(width: 10),
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Vehicle ${vehicle['id']}',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                       Text(
                                         'Status: ${vehicle['status']}',
                                         style: TextStyle(
-                                          color: _getStatusColor(vehicle['status']),
+                                          color: _getStatusColor(
+                                            vehicle['status'],
+                                          ),
                                           fontSize: 14,
                                         ),
                                       ),
@@ -554,12 +634,28 @@ class _HomePageState extends State<HomePage> {
                                 ],
                               ),
                               SizedBox(height: 8),
-                              _buildInfoRow('Distance:', '${distance.toStringAsFixed(1)} m'),
-                              _buildInfoRow('Direction:', '${angle.toStringAsFixed(1)}°'),
-                              _buildInfoRow('Speed:', '${vehicle['speed']} km/h'),
-                              _buildInfoRow('Position:', 'Lat: ${vehicle['latitude']}, Lon: ${vehicle['longitude']}'),
-                              _buildInfoRow('Last Update:', vehicle['lastReceivedTime']),
-                              if (vehicle['mac'] != null) _buildInfoRow('MAC:', vehicle['mac']),
+                              _buildInfoRow(
+                                'Distance:',
+                                '${distance.toStringAsFixed(1)} m',
+                              ),
+                              _buildInfoRow(
+                                'Direction:',
+                                '${angle.toStringAsFixed(1)}°',
+                              ),
+                              _buildInfoRow(
+                                'Speed:',
+                                '${vehicle['speed']} km/h',
+                              ),
+                              _buildInfoRow(
+                                'Position:',
+                                'Lat: ${vehicle['latitude']}, Lon: ${vehicle['longitude']}',
+                              ),
+                              _buildInfoRow(
+                                'Last Update:',
+                                vehicle['lastReceivedTime'],
+                              ),
+                              if (vehicle['mac'] != null)
+                                _buildInfoRow('MAC:', vehicle['mac']),
                             ],
                           ),
                         ),
@@ -592,7 +688,8 @@ class _HomePageState extends State<HomePage> {
             child: ListView.builder(
               itemCount: widget.connectionManager!.availableDevices.length,
               itemBuilder: (context, index) {
-                final device = widget.connectionManager!.availableDevices[index];
+                final device =
+                    widget.connectionManager!.availableDevices[index];
                 return Card(
                   child: ListTile(
                     leading: Icon(Icons.usb, color: Colors.indigo),
@@ -611,7 +708,9 @@ class _HomePageState extends State<HomePage> {
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () => widget.connectionManager!.connectToDevice(device),
+                      onPressed:
+                          () =>
+                              widget.connectionManager!.connectToDevice(device),
                     ),
                   ),
                 );
@@ -629,9 +728,20 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
           SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: isGood ? Colors.green : Colors.black))),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: isGood ? Colors.green : Colors.black),
+            ),
+          ),
         ],
       ),
     );
@@ -639,10 +749,14 @@ class _HomePageState extends State<HomePage> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'connected': return Colors.green;
-      case 'warning': return Colors.orange;
-      case 'error': return Colors.red;
-      default: return Colors.grey;
+      case 'connected':
+        return Colors.green;
+      case 'warning':
+        return Colors.orange;
+      case 'error':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 }
@@ -684,7 +798,10 @@ class RadarView extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.transparent,
-                    border: Border.all(color: Colors.indigo.withOpacity(0.5), width: 1),
+                    border: Border.all(
+                      color: Colors.indigo.withOpacity(0.5),
+                      width: 1,
+                    ),
                   ),
                 ),
               );
@@ -694,8 +811,14 @@ class RadarView extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Colors.indigo.withOpacity(0.3), width: 1),
-                  left: BorderSide(color: Colors.indigo.withOpacity(0.3), width: 1),
+                  top: BorderSide(
+                    color: Colors.indigo.withOpacity(0.3),
+                    width: 1,
+                  ),
+                  left: BorderSide(
+                    color: Colors.indigo.withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
               ),
             ),
@@ -707,9 +830,12 @@ class RadarView extends StatelessWidget {
               final selfLat = _toDouble(selfLatitude) ?? 0;
               final selfLon = _toDouble(selfLongitude) ?? 0;
 
-              if (vehicleLat == null || vehicleLon == null ||
-                  vehicleLat == 0 || vehicleLon == 0 ||
-                  selfLat == 0 || selfLon == 0) {
+              if (vehicleLat == null ||
+                  vehicleLon == null ||
+                  vehicleLat == 0 ||
+                  vehicleLon == 0 ||
+                  selfLat == 0 ||
+                  selfLon == 0) {
                 return SizedBox.shrink();
               }
 
@@ -789,10 +915,14 @@ class RadarView extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'connected': return Colors.green;
-      case 'warning': return Colors.orange;
-      case 'error': return Colors.red;
-      default: return Colors.blue;
+      case 'connected':
+        return Colors.green;
+      case 'warning':
+        return Colors.orange;
+      case 'error':
+        return Colors.red;
+      default:
+        return Colors.blue;
     }
   }
 }
@@ -805,9 +935,9 @@ double calculateHaversine(double lat1, double lon1, double lat2, double lon2) {
   final deltaPhi = (lat2 - lat1) * pi / 180;
   final deltaLambda = (lon2 - lon1) * pi / 180;
 
-  final a = sin(deltaPhi / 2) * sin(deltaPhi / 2) +
-      cos(phi1) * cos(phi2) *
-          sin(deltaLambda / 2) * sin(deltaLambda / 2);
+  final a =
+      sin(deltaPhi / 2) * sin(deltaPhi / 2) +
+      cos(phi1) * cos(phi2) * sin(deltaLambda / 2) * sin(deltaLambda / 2);
   final c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
   return R * c;
@@ -820,8 +950,8 @@ double calculateAngle(double lat1, double lon1, double lat2, double lon2) {
   final lat2Rad = lat2 * pi / 180;
 
   final y = sin(deltaLon) * cos(lat2Rad);
-  final x = cos(lat1Rad) * sin(lat2Rad) -
-      sin(lat1Rad) * cos(lat2Rad) * cos(deltaLon);
+  final x =
+      cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(deltaLon);
 
   var angle = atan2(y, x) * 180 / pi;
   return (angle + 360) % 360; // Normalize to 0-360
