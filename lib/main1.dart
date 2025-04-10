@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:usb_serial/transaction.dart';
 import 'package:usb_serial/usb_serial.dart';
-// import 'package:vivan_app/voicechat.dart';
+import 'package:vivan_app/voicestate.dart';
 
 void main() => runApp(SerialMonitorApp());
 
@@ -172,266 +172,6 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class ConnectedView extends StatefulWidget {
-  final Map<String, dynamic> connectedVehicle;
-  final UsbConnectionManager connectionManager;
-
-  const ConnectedView({
-    Key? key,
-    required this.connectedVehicle,
-    required this.connectionManager,
-  }) : super(key: key);
-
-  @override
-  _ConnectedViewState createState() => _ConnectedViewState();
-}
-
-class _ConnectedViewState extends State<ConnectedView> {
-  final TextEditingController _messageController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [];
-  late StreamSubscription<Map<String, dynamic>> _chatMessageSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _chatMessageSubscription = widget.connectionManager.chatMessageStream
-        .listen((message) {
-          if (message['mac'] == widget.connectedVehicle['mac']) {
-            setState(() {
-              _messages.add({
-                'message': message['message'],
-                'isMe': false,
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
-              });
-            });
-          }
-        });
-  }
-
-  @override
-  void dispose() {
-    _chatMessageSubscription.cancel();
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  void _sendMessage() {
-    if (_messageController.text.isEmpty) return;
-
-    // Send the message
-    widget.connectionManager.sendChatMessage(
-      _messageController.text,
-      widget.connectedVehicle['mac'],
-    );
-
-    // Add to local messages immediately
-    setState(() {
-      _messages.add({
-        'message': _messageController.text,
-        'isMe': true,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      });
-    });
-
-    // Clear the input field
-    _messageController.clear();
-  }
-
-  void _disconnect() {
-    widget.connectionManager.sendChatResponse(
-      "Disconnect",
-      widget.connectedVehicle['mac'],
-      widget.connectionManager.selfVehicle['vehicle'],
-    );
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Card(
-          margin: EdgeInsets.all(12),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'CONNECTED TO',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green[700],
-                      ),
-                    ),
-                    Icon(
-                      Icons.signal_wifi_statusbar_4_bar_rounded,
-                      color: Colors.green,
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                _buildConnectionInfoRow(
-                  'Vehicle:',
-                  widget.connectedVehicle['vehicle'],
-                ),
-                _buildConnectionInfoRow(
-                  'MAC Address:',
-                  widget.connectedVehicle['mac'],
-                ),
-                SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _disconnect,
-                  child: Text('DISCONNECT'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    minimumSize: Size(double.infinity, 40),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.grey[50]),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    reverse: false,
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      return _buildMessageBubble(message);
-                    },
-                  ),
-                ),
-                SizedBox(height: 8),
-                _buildMessageInput(),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConnectionInfoRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.black87))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageBubble(Map<String, dynamic> message) {
-    final isMe = message['isMe'] == true;
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
-      child: Align(
-        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-          ),
-          child: Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isMe ? Colors.blue[100] : Colors.grey[200],
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-                bottomLeft: isMe ? Radius.circular(12) : Radius.circular(0),
-                bottomRight: isMe ? Radius.circular(0) : Radius.circular(12),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isMe
-                      ? 'You'
-                      : widget.connectedVehicle['vehicle'] ?? 'Unknown',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: isMe ? Colors.blue[800] : Colors.indigo,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(message['message'], style: TextStyle(fontSize: 14)),
-                SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(message['timestamp']),
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _messageController,
-            decoration: InputDecoration(
-              hintText: 'Type your message...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: Colors.grey[200],
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-            onSubmitted: (_) => _sendMessage(),
-          ),
-        ),
-        SizedBox(width: 8),
-        CircleAvatar(
-          backgroundColor: Colors.indigo,
-          child: IconButton(
-            icon: Icon(Icons.send, color: Colors.white),
-            onPressed: _sendMessage,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatTimestamp(int? timestamp) {
-    if (timestamp == null) return '';
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-  }
-}
-
 class MainNavigationPage extends StatefulWidget {
   @override
   _MainNavigationPageState createState() => _MainNavigationPageState();
@@ -443,45 +183,17 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
   late StreamSubscription<Map<String, dynamic>> _requestSubscription;
 
-  Map<String, dynamic>? _connectedVehicle;
-
-  late StreamSubscription<Map<String, dynamic>> _chatResponseSubscription;
-
   @override
   void initState() {
     super.initState();
     _connectionManager.init();
     _setupRequestListener();
-    _setupChatResponseListener();
-  }
-
-  void _setupChatResponseListener() {
-    _chatResponseSubscription = _connectionManager.chatResponseStream.listen((
-      response,
-    ) {
-      if (response['response'] == 'Accepted') {
-        setState(() {
-          _connectedVehicle = {
-            'vehicle': response['vehicle'] ?? 'Unknown',
-            'mac': response['mac'],
-          };
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connection accepted by ${response['mac']}')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connection rejected by ${response['mac']}')),
-        );
-      }
-    });
   }
 
   void _setupRequestListener() {
     _requestSubscription = _connectionManager.requestStream.listen((request) {
+      print('Connection request received: $request');
       _showConnectionRequestDialog(request);
-
-      print(request);
     });
   }
 
@@ -491,44 +203,23 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       builder:
           (context) => AlertDialog(
             title: Text('Connection Request'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Vehicle ${request['vehicle']} wants to connect!'),
-                SizedBox(height: 8),
-                Text('MAC: ${request['mac']}'),
-              ],
+            content: Text(
+              'Vehicle ${request['vehicle']} wants to connect with you!\n'
+              'MAC: ${request['mac']}',
             ),
             actions: [
               TextButton(
-                child: Text('REJECT'),
-                onPressed: () {
-                  _connectionManager.sendChatResponse(
-                    "Rejected",
-                    request['mac'],
-                    _connectionManager.selfVehicle['vehicle'],
-                  );
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Connection request rejected')),
-                  );
-                },
+                child: Text('Reject'),
+                onPressed: () => Navigator.pop(context),
               ),
               TextButton(
-                child: Text('ACCEPT'),
+                child: Text('Accept'),
                 onPressed: () {
-                  _connectionManager.sendChatResponse(
-                    "Accepted",
-                    request['mac'],
-                    _connectionManager.selfVehicle['vehicle'],
-                  );
-                  setState(() {
-                    _connectedVehicle = {
-                      'vehicle': request['vehicle'],
-                      'mac': request['mac'],
-                    };
-                  });
+                  // You can add logic here to handle the accepted connection
                   Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Connection established!')),
+                  );
                 },
               ),
             ],
@@ -538,7 +229,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
   @override
   void dispose() {
-    _chatResponseSubscription.cancel();
     _requestSubscription.cancel();
     _connectionManager.dispose();
     super.dispose();
@@ -547,18 +237,17 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('VIVAN Serial Monitor')),
+      appBar: AppBar(
+        title: const Text(
+          'VIVAN Serial Monitor',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          // Modified HomePage to show either connected view or normal view
-          _connectedVehicle != null
-              ? ConnectedView(
-                connectedVehicle: _connectedVehicle!,
-                connectionManager: _connectionManager,
-              )
-              : HomePage(connectionManager: _connectionManager),
-          // VoiceChat(),
+          HomePage(connectionManager: _connectionManager),
+          VoiceState(usbOldConnection: _connectionManager),
           SelfVehiclePage(connectionManager: _connectionManager),
           DevelopersPage(),
           SettingsPage(),
@@ -611,17 +300,6 @@ class UsbConnectionManager {
   final StreamController<Map<String, dynamic>> _selfVehicleController =
       StreamController.broadcast();
 
-  // Add these new stream controllers
-  final StreamController<Map<String, dynamic>> _chatResponseController =
-      StreamController.broadcast();
-  final StreamController<Map<String, dynamic>> _chatMessageController =
-      StreamController.broadcast();
-
-  Stream<Map<String, dynamic>> get chatResponseStream =>
-      _chatResponseController.stream;
-  Stream<Map<String, dynamic>> get chatMessageStream =>
-      _chatMessageController.stream;
-
   Stream<String> get statusStream => _statusController.stream;
   Stream<List<Map<String, dynamic>>> get vehiclesStream =>
       _vehiclesController.stream;
@@ -633,79 +311,23 @@ class UsbConnectionManager {
       StreamController.broadcast();
   Stream<Map<String, dynamic>> get requestStream => _requestController.stream;
 
-  Future<void> sendChatResponse(
-    String response,
-    String mac,
-    String vehicle,
-  ) async {
-    if (_port == null) return;
-
-    try {
-      final payload = {
-        "type": "ChatResponse",
-        "response": response,
-        "mac": mac,
-        "vehicle": vehicle,
-        "timestamp": DateTime.now().millisecondsSinceEpoch,
-      };
-
-      final message = '${jsonEncode(payload)}\n';
-      await _port!.write(Uint8List.fromList(message.codeUnits));
-    } catch (e) {
-      debugPrint("Error sending chat response: $e");
-    }
-  }
-
-  Future<void> sendChatMessage(String message, String mac) async {
-    if (_port == null) return;
-
-    try {
-      final payload = {
-        "type": "ChatMessage",
-        "message": message, // Changed from 'msg' to 'message' to match Python
-        "mac": mac,
-      };
-
-      final serializedMessage = '${jsonEncode(payload)}\n';
-      await _port!.write(Uint8List.fromList(serializedMessage.codeUnits));
-    } catch (e) {
-      debugPrint("Error sending chat message: $e");
-    }
-  }
-
   void _processSerialData(String line) {
-    print("Received line: $line"); // Debugging line
     try {
       final dynamic decoded = jsonDecode(line);
 
-      if (decoded is Map<String, dynamic>) {
-        switch (decoded['type']) {
-          case "Packet":
-            _updateVehicleInformation(decoded);
-            _updateSelfVehicleInformation(decoded);
-            break;
-          case "ChatRequest":
-            _requestController.add(decoded);
-            break;
-          case "ChatResponse":
-            _chatResponseController.add(decoded);
-            break;
-          case "ChatMessage":
-            print("Chat message received: ${decoded['msg']}"); // Debugging line
-            // Ensure the message has the expected format
-            if (decoded['msg'] != null && decoded['mac'] != null) {
-              _chatMessageController.add({
-                'message': decoded['msg'],
-                'mac': decoded['mac'],
-              });
-            }
-            break;
-          default:
-          // debugPrint("Unknown message type: ${decoded['type']}");
-        }
+      // Handle Packet type messages
+      if (decoded is Map<String, dynamic> && decoded['type'] == "Packet") {
+        _updateVehicleInformation(decoded);
+        _updateSelfVehicleInformation(decoded);
+      }
+      // Handle Request type messages
+      else if (decoded is Map<String, dynamic> &&
+          decoded['type'] == "ChatRequest") {
+        print("Request is Coming!!!");
+        _requestController.add(decoded);
       }
     } catch (e) {
-      // debugPrint("Error parsing data: $e");
+      debugPrint("Error parsing data: $e");
     }
   }
 
@@ -771,6 +393,7 @@ class UsbConnectionManager {
 
       transaction.stream.listen(
         (String line) {
+          print("Received Line: $line");
           _processSerialData(line);
         },
         onDone: () {
@@ -862,8 +485,6 @@ class UsbConnectionManager {
     _vehiclesController.close();
     _selfVehicleController.close();
     _requestController.close(); // Added new line
-    _chatResponseController.close();
-    _chatMessageController.close();
   }
 }
 
@@ -880,9 +501,6 @@ class _HomePageState extends State<HomePage> {
   late StreamSubscription<String> _statusSubscription;
   late StreamSubscription<List<Map<String, dynamic>>> _vehiclesSubscription;
   late StreamSubscription<Map<String, dynamic>> _selfVehicleSubscription;
-
-  late StreamSubscription<Map<String, dynamic>> _chatResponseSubscription;
-
   String _status = "Disconnected";
   List<Map<String, dynamic>> vehicleInformation = [];
   Map<String, dynamic> selfVehicle = {
@@ -893,6 +511,14 @@ class _HomePageState extends State<HomePage> {
     'time': 'Time Unavailable',
     'status': 'Disconnected',
   };
+
+  late UsbDevice connectedDevice;
+
+  void setConnectedDevice(UsbDevice dev) {
+    setState(() {
+      connectedDevice = dev;
+    });
+  }
 
   // Add this new method to handle the connection initiation
   // Updated method to send JSON-formatted request
@@ -922,20 +548,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleChatResponse(Map<String, dynamic> response) {
-    if (response['response'] == 'Accepted') {
-      // This device initiated the request that was accepted
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection accepted by ${response['mac']}')),
-      );
-      // You might want to update the connection state here too
-    } else if (response['response'] == 'Rejected') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection rejected by ${response['mac']}')),
-      );
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -947,14 +559,10 @@ class _HomePageState extends State<HomePage> {
     );
     _selfVehicleSubscription = widget.connectionManager!.selfVehicleStream
         .listen((vehicle) => setState(() => selfVehicle = vehicle));
-    _chatResponseSubscription = widget.connectionManager!.requestStream
-        .where((data) => data['type'] == 'ChatResponse')
-        .listen(_handleChatResponse);
   }
 
   @override
   void dispose() {
-    _chatResponseSubscription.cancel();
     _statusSubscription.cancel();
     _vehiclesSubscription.cancel();
     _selfVehicleSubscription.cancel();
@@ -1217,8 +825,10 @@ class _HomePageState extends State<HomePage> {
                         foregroundColor: Colors.white,
                       ),
                       onPressed:
-                          () =>
-                              widget.connectionManager!.connectToDevice(device),
+                          () => {
+                            widget.connectionManager!.connectToDevice(device),
+                            setConnectedDevice(device),
+                          },
                     ),
                   ),
                 );
