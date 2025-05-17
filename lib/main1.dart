@@ -247,7 +247,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         index: _currentIndex,
         children: [
           HomePage(connectionManager: _connectionManager),
-          VoiceState(usbOldConnection: _connectionManager),
+          VoiceState(),
           SelfVehiclePage(connectionManager: _connectionManager),
           DevelopersPage(),
           SettingsPage(),

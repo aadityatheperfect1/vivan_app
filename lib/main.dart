@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:usb_serial/transaction.dart';
 import 'package:usb_serial/usb_serial.dart';
 // import 'package:vivan_app/voicechat.dart';
+import 'package:vivan_app/voicestate.dart';
 
 void main() => runApp(SerialMonitorApp());
 
@@ -151,7 +152,7 @@ class DevelopersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text('Developers Page', style: TextStyle(fontSize: 24)),
+      child: Text('Developers1 Page', style: TextStyle(fontSize: 24)),
     );
   }
 }
@@ -558,7 +559,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 connectionManager: _connectionManager,
               )
               : HomePage(connectionManager: _connectionManager),
-          // VoiceChat(),
+          VoiceState(
+            usbOldConnection: _connectionManager,
+            connectedVehicle: _connectedVehicle,
+          ),
           SelfVehiclePage(connectionManager: _connectionManager),
           DevelopersPage(),
           SettingsPage(),

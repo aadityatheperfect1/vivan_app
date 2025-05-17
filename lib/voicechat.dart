@@ -9,6 +9,7 @@ class UsbSerialManagerVoice {
   UsbPort? _port;
   UsbDevice? _device;
   bool _isConnected = false;
+  bool _isRecording = false;
 
   // Callback for received data
   final Function(String)? onDataReceived;
@@ -95,14 +96,6 @@ class UsbSerialManagerVoice {
   }
 }
 
-Future<void> _toggleRecording() async {
-  // if (_isRecording) {
-  //   // await _stopRecording();
-  // } else {
-  //   // await _startRecording();
-  // }
-}
-
 Future<void> _processAndSendRecording() async {
   // if (_hasRecording) {
   //   // Process and send the recording
@@ -132,6 +125,58 @@ class VoiceChat extends StatelessWidget {
       print('Received Secondary: $data');
     },
   );
+
+  Future<void> _startRecording() async {
+    final path = await getRecordingPath();
+    try {
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits, // Most efficient for voice
+          bitRate: 16, // 16 kbps (minimum for intelligible voice)
+          sampleRate: 8000, // 8kHz (narrowband, standard for VoIP)
+          numChannels: 1, // Mono
+        ),
+        path: path,
+      );
+      setState(() {
+        _isRecording = true;
+        _hasRecording = false;
+        _recordingPath = path;
+        _packetLogs.clear();
+      });
+
+      // Update recording duration
+      Timer.periodic(Duration(seconds: 1), (timer) {
+        if (!_isRecording) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          _recordingDuration += Duration(seconds: 1);
+        });
+      });
+    } catch (e) {
+      print('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    final path = await _audioRecorder.stop();
+    setState(() {
+      _isRecording = false;
+      _hasRecording = true;
+      _recordingPath = path;
+    });
+    print('Recording saved to: $path');
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      // await _stopRecording();
+    } else {
+      // await _startRecording();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
