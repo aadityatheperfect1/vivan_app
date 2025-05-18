@@ -60,8 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _chatResponseController = usbManager.chatResponseStream.listen((response) {
       print("Chat Response: $response");
       if (response['response'] == "Accepted") {
+        print(response);
         usbManager.connectedVehicle?['mac'] = response['mac'];
-        usbManager.connectedVehicle?['vehicle'] = response['vehicle'];
+        usbManager.connectedVehicle?['name'] = response['vehicle'];
         usbManager.connectedVehicle?['status'] = "Connected";
         print("Connection Accepted");
       } else {
@@ -413,6 +414,20 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(width: 8),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
 }
 
 class _RadarCrossPainter extends CustomPainter {
@@ -723,18 +738,12 @@ class _ConnectedViewState extends State<ConnectedView> {
       context,
       listen: false,
     );
-
-    // Send disconnect message
     usbManager.sendChatResponse(
       "Disconnect",
       usbManager.connectedVehicle?['mac'],
       usbManager.selfVehicle['vehicle'],
     );
-
-    // Update internal state to reflect disconnection
-    usbManager.connectedVehicle?['mac'] = "00:00:00:00";
-    usbManager.connectedVehicle?['vehicle'] = "No Vehicle";
-    usbManager.connectedVehicle?['status'] = "Disconnected";
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -744,17 +753,16 @@ class _ConnectedViewState extends State<ConnectedView> {
       children: [
         // Connection Status Card
         Card(
-          margin: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          elevation: 2,
+          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          elevation: 1,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Padding(
-            padding: EdgeInsets.all(10),
+            padding: EdgeInsets.all(12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
+                // Connection Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -762,15 +770,15 @@ class _ConnectedViewState extends State<ConnectedView> {
                       children: [
                         Icon(
                           Icons.check_circle,
-                          color: Colors.green[600],
-                          size: 18,
+                          color: Colors.green[700],
+                          size: 20,
                         ),
-                        SizedBox(width: 6),
+                        SizedBox(width: 8),
                         Text(
-                          'Connected to Vehicle',
+                          'CONNECTED',
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: Colors.green[700],
                           ),
                         ),
@@ -778,69 +786,48 @@ class _ConnectedViewState extends State<ConnectedView> {
                     ),
                     Icon(
                       Icons.signal_wifi_4_bar,
-                      color: Colors.green[600],
-                      size: 20,
+                      color: Colors.green[700],
+                      size: 24,
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                SizedBox(height: 5),
 
-                // Vehicle Info + Compact Disconnect Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // Connection Info - Compact Two Column Layout
+                Table(
+                  columnWidths: const {
+                    0: IntrinsicColumnWidth(),
+                    1: FlexColumnWidth(),
+                  },
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.directions_car,
-                          size: 18,
-                          color: Colors.grey[600],
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          usbManager.connectedVehicle?['vehicle'] ?? 'Unknown',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    _buildConnectionInfoRow(
+                      'Vehicle: ',
+                      usbManager.connectedVehicle?['vehicle'],
                     ),
-                    ElevatedButton.icon(
-                      onPressed: _disconnect,
-                      icon: Icon(Icons.link_off, size: 16, color: Colors.white),
-                      label: Text(
-                        'Disconnect',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[600],
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        minimumSize: Size(0, 0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 1,
-                      ),
+                    _buildConnectionInfoRow(
+                      'MAC:',
+                      usbManager.connectedVehicle?['mac'],
                     ),
                   ],
                 ),
-                SizedBox(height: 4),
+                SizedBox(height: 6),
 
-                // MAC Address
-                Row(
-                  children: [
-                    Icon(Icons.memory, size: 18, color: Colors.grey[600]),
-                    SizedBox(width: 6),
-                    Text(
-                      usbManager.connectedVehicle?['mac'] ?? 'N/A',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+                // Disconnect Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _disconnect,
+                    icon: Icon(Icons.link_off, size: 18),
+                    label: Text('DISCONNECT'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[600],
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -884,6 +871,30 @@ class _ConnectedViewState extends State<ConnectedView> {
   }
 
   // Helper method for connection info rows
+  TableRow _buildConnectionInfoRow(String label, String? value) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            value ?? '--',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    );
+  }
 
   // Widget _buildConnectionInfoRow(String label, String value) {
   //   return Padding(

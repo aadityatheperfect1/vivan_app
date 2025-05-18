@@ -1,44 +1,35 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'dart:io';
 import 'package:record/record.dart';
 import 'dart:async';
-import 'dart:typed_data';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'package:vivan_app/UsbConnectionManager.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 Future<void> requestMicrophonePermission() async {
   final micStatus = await Permission.microphone.request();
+
   if (micStatus.isGranted) {
     print("Microphone permission granted");
   } else {
     print("Microphone Permissions not granted");
+    // openAppSettings(); // Optional: direct user to app settings
   }
 
+  // Request storage permission depending on Android version
   if (await Permission.manageExternalStorage.isGranted == false &&
       await Permission.storage.isGranted == false) {
+    // Request manage storage permission (for Android 11+)
     await Permission.manageExternalStorage.request();
     await Permission.storage.request();
   }
 
+  // Optional: check if still denied
   if (await Permission.storage.isDenied) {
     print("Storage permission denied");
   }
-}
-
-Future<String> getRecordingPath() async {
-  final dir = await getExternalStorageDirectory();
-  if (dir == null) {
-    throw Exception('Unable to get external storage directory');
-  }
-  final recordingsDir = Directory('${dir.path}/Recordings');
-  if (!await recordingsDir.exists()) {
-    await recordingsDir.create();
-  }
-  return '${recordingsDir.path}/tempRecording.m4a';
 }
 
 class Voicechatscreen extends StatefulWidget {
@@ -50,21 +41,59 @@ class Voicechatscreen extends StatefulWidget {
 
 class _VoicechatscreenState extends State<Voicechatscreen> {
   bool isRecording = false;
-  String _recordingPath = '';
+  bool isPlaying = false;
   final AudioPlayer audioPlayer = AudioPlayer();
   final AudioRecorder audioRecorder = AudioRecorder();
+  final bool _isReceiving = false;
   bool _hasRecording = false;
   Duration _recordingDuration = Duration.zero;
+  String _spokenText = '';
+  bool _isListening = false;
   Timer? _recordingTimer;
-  final _isReceiving = false;
+
+  String _receivedMessage = '';
+
+  bool isDeviceConnected = false;
+  bool isVehicleConnected = false;
+
+  late StreamSubscription<String> _statusSubscription;
 
   StreamSubscription? _connectionSubscription;
   StreamSubscription? _vehicleSubscription;
+  StreamSubscription? _messageSubscription;
 
-  @override
+  final FlutterTts flutterTts = FlutterTts();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+
+  Future<void> _initializeTts() async {
+    await flutterTts.setLanguage("en-IN");
+    await flutterTts.setSpeechRate(0.5); // Speed of speech (0 to 1)
+    await flutterTts.setVolume(1.0); // Volume (0 to 1)
+    await flutterTts.setPitch(1.0); // Pitch (0.5 to 2.0)
+  }
+
+  Future<void> _initSpeech() async {
+    bool available = await _speech.initialize();
+    if (!available) {
+      print("Speech recognition not available");
+    }
+  }
+
   void initState() {
     super.initState();
-    requestMicrophonePermission();
+    final usbManager = Provider.of<UsbConnectionManager>(
+      context,
+      listen: false,
+    );
+
+    _statusSubscription = usbManager.statusStream.listen((status) {
+      setState(() {
+        isDeviceConnected = status == 'Connected';
+      });
+    });
+
+    _initializeTts();
+    _initSpeech();
     _setupConnectionListeners();
   }
 
@@ -78,19 +107,17 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
       if (mounted) setState(() {});
     });
 
-    _vehicleSubscription = usbManager.chatResponseStream.listen((response) {
+    _vehicleSubscription = usbManager.vehiclesStream.listen((response) {
       if (mounted) setState(() {});
     });
-  }
 
-  @override
-  void dispose() {
-    _connectionSubscription?.cancel();
-    _vehicleSubscription?.cancel();
-    _recordingTimer?.cancel();
-    audioPlayer.dispose();
-    audioRecorder.dispose();
-    super.dispose();
+    _messageSubscription = usbManager.voiceMessageStream.listen((message) {
+      if (mounted) {
+        setState(() {
+          _receivedMessage = message;
+        });
+      }
+    });
   }
 
   Future<void> _processAndSendRecording() async {
@@ -99,128 +126,74 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
       listen: false,
     );
 
-    if (_recordingPath.isEmpty) {
-      print("No recording available to send");
-      return;
-    }
+    print("Sending message: $_spokenText");
 
-    try {
-      final file = File(_recordingPath);
-      final m4aBytes = await file.readAsBytes();
-      final aacFrames = extractAACFrames(m4aBytes);
-      print("AAC Frames extracted: ${aacFrames.length}");
-
-      final payload = {
-        "type": "voiceRequest",
-        "vehicle": usbManager.connectedVehicle?['name'],
-        "mac": usbManager.connectedVehicle?['mac'],
-        "sequence": 0,
-      };
-
-      final msg = '${jsonEncode(payload)}\n';
-      print("Sending: $msg");
-      // usbManager.usbPort?.write(Uint8List.fromList(msg.codeUnits));
-
-      setState(() {
-        _hasRecording = false;
-        _recordingPath = '';
-      });
-    } catch (e) {
-      print("Error sending recording: $e");
-    }
-  }
-
-  Future<void> _startRecording() async {
-    final path = await getRecordingPath();
-    try {
-      await audioRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 16000,
-          sampleRate: 8000,
-          numChannels: 1,
-        ),
-        path: path,
+    if (_spokenText.isNotEmpty) {
+      await usbManager.sendVoiceMessage(
+        _spokenText,
+        '${usbManager.connectedVehicle?['mac'] ?? ''}',
       );
-
-      setState(() {
-        isRecording = true;
-        _hasRecording = false;
-        _recordingPath = path;
-        _recordingDuration = Duration.zero;
-      });
-
-      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!isRecording) {
-          timer.cancel();
-          return;
-        }
-        setState(() {
-          _recordingDuration += const Duration(seconds: 1);
-        });
-      });
-    } catch (e) {
-      print('Error starting recording: $e');
-      setState(() => isRecording = false);
+    } else {
+      print("No recording to send");
     }
+    setState(() {
+      _hasRecording = false;
+    });
   }
 
-  Future<void> _stopRecording() async {
-    _recordingTimer?.cancel();
-    try {
-      final path = await audioRecorder.stop();
+  Future<void> _startListening() async {
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isListening) {
+        timer.cancel();
+        return;
+      }
       setState(() {
-        isRecording = false;
-        _hasRecording = true;
-        _recordingPath = path!;
+        _recordingDuration += const Duration(seconds: 1);
       });
-      print('Recording saved to: $path');
-    } catch (e) {
-      print('Error stopping recording: $e');
-      setState(() => isRecording = false);
-    }
+    });
+    await _speech.listen(
+      onResult: (result) {
+        setState(() {
+          _spokenText = result.recognizedWords;
+        });
+      },
+    );
+    setState(() => _isListening = true);
+  }
+
+  Future<void> _stopListening() async {
+    _recordingTimer?.cancel();
+    await _speech.stop();
+    setState(() {
+      _isListening = false;
+      _hasRecording = true;
+      _recordingDuration = Duration.zero;
+    });
   }
 
   Future<void> _toggleRecording() async {
-    if (isRecording) {
-      await _stopRecording();
+    if (!_isListening) {
+      // Start recording
+      print("Recording started");
+      await _startListening();
     } else {
-      await _startRecording();
+      // Stop recording
+      await _stopListening();
     }
-  }
-
-  List<Uint8List> extractAACFrames(Uint8List m4aBytes) {
-    List<Uint8List> frames = [];
-    int pos = 0;
-
-    while (pos + 7 < m4aBytes.length) {
-      if (m4aBytes[pos] == 0xFF && (m4aBytes[pos + 1] & 0xF0) == 0xF0) {
-        int frameLength =
-            ((m4aBytes[pos + 3] & 0x03) << 11) |
-            (m4aBytes[pos + 4] << 3) |
-            ((m4aBytes[pos + 5] & 0xE0) >> 5);
-
-        if (pos + frameLength <= m4aBytes.length) {
-          frames.add(m4aBytes.sublist(pos, pos + frameLength));
-          pos += frameLength;
-        } else {
-          break;
-        }
-      } else {
-        pos++;
-      }
-    }
-    return frames;
   }
 
   Future<void> _playMessage() async {
-    if (_recordingPath.isEmpty) return;
+    await flutterTts.speak(_receivedMessage);
+  }
 
-    try {
-      await audioPlayer.play(DeviceFileSource(_recordingPath));
-    } catch (e) {
-      print("Error playing message: $e");
-    }
+  void dispose() {
+    _statusSubscription.cancel();
+    flutterTts.stop();
+    _recordingTimer?.cancel();
+    _connectionSubscription?.cancel();
+    _vehicleSubscription?.cancel();
+    _messageSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -236,8 +209,9 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
         }
 
         if (!isVehicleConnected) {
-          return const Center(child: Text('No Vehicle connected'));
+          return const Center(child: Text('No vehicle connected'));
         }
+
         return Scaffold(
           body: Column(
             children: [
@@ -268,10 +242,10 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
                               height: 80,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isRecording ? Colors.red : Colors.blue,
+                                color: _isListening ? Colors.red : Colors.blue,
                               ),
                               child: Icon(
-                                isRecording ? Icons.stop : Icons.mic,
+                                _isListening ? Icons.stop : Icons.mic,
                                 color: Colors.white,
                                 size: 40,
                               ),
@@ -296,7 +270,7 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
                           ),
                         SizedBox(height: 20),
                         Text(
-                          isRecording
+                          _isListening
                               ? 'Recording: ${_recordingDuration.inSeconds}s'
                               : _hasRecording
                               ? 'Recording ready to send'
@@ -328,15 +302,7 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
                           ),
                           const SizedBox(height: 40),
 
-                          if (4 < 2) ...[
-                            const CircularProgressIndicator(),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Receiving message...',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ] else if (_recordingPath != '' &&
-                              _recordingPath.isNotEmpty) ...[
+                          if (_receivedMessage.isNotEmpty) ...[
                             TextButton.icon(
                               onPressed: _playMessage,
                               icon: const Icon(
@@ -390,6 +356,10 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
             ],
           ),
         );
+        // if (usbSerialManagerVoice!._isConnected) {
+        // } else {
+        //   return Text('No device connected');
+        // }
       },
     );
   }

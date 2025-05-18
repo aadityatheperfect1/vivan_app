@@ -22,6 +22,9 @@ class UsbConnectionManager {
   String _status = "Disconnected";
   List<UsbDevice> _availableDevices = [];
   List<Map<String, dynamic>> vehicleInformation = [];
+  String voiceMsg = "";
+
+  UsbPort? get port => _port;
 
   final Map<String, dynamic> _connectedVehicle = {
     "name": "Unknown",
@@ -41,7 +44,7 @@ class UsbConnectionManager {
   };
 
   void setConnectedVehicle(Map<String, dynamic> vehicle) {
-    _connectedVehicle['name'] = vehicle['name'];
+    _connectedVehicle['name'] = vehicle['id'];
     _connectedVehicle['mac'] = vehicle['mac'];
     _connectedVehicle['status'] = vehicle['status'];
     // notifyListeners();
@@ -65,10 +68,15 @@ class UsbConnectionManager {
   final StreamController<Map<String, dynamic>> _chatMessageController =
       StreamController.broadcast();
 
+  final StreamController<String> _voiceMessageController =
+      StreamController.broadcast();
+
   Stream<Map<String, dynamic>> get chatResponseStream =>
       _chatResponseController.stream;
   Stream<Map<String, dynamic>> get chatMessageStream =>
       _chatMessageController.stream;
+
+  Stream<String> get voiceMessageStream => _voiceMessageController.stream;
 
   Stream<String> get statusStream => _statusController.stream;
   Stream<List<Map<String, dynamic>>> get vehiclesStream =>
@@ -139,6 +147,17 @@ class UsbConnectionManager {
     }
   }
 
+  Future<void> sendVoiceMessage(String message, String mac) async {
+    if (_port == null) return;
+    try {
+      final payload = {"type": "VoiceMessage", "message": message, "mac": mac};
+      final serializedMessage = '${jsonEncode(payload)}\n';
+      await _port!.write(Uint8List.fromList(serializedMessage.codeUnits));
+    } catch (e) {
+      debugPrint("Error sending voice message: $e");
+    }
+  }
+
   void _processSerialData(String line) {
     print("Received line: $line"); // Debugging line
     try {
@@ -155,6 +174,17 @@ class UsbConnectionManager {
             break;
           case "ChatResponse":
             _chatResponseController.add(decoded);
+            break;
+          case "VoiceMessage":
+            // Handle voice message if needed
+            _voiceMessageController.add(decoded['msg']);
+            break;
+          case "Disconnect":
+            _connectedVehicle['name'] = "No Vehicle";
+            _connectedVehicle['mac'] = "00:00:00:00";
+            _connectedVehicle['status'] = "Disconnected";
+            _statusController.add("Disconnected");
+            print("Disconnected!");
             break;
           case "ChatMessage":
             print("Chat message received: ${decoded['msg']}"); // Debugging line
