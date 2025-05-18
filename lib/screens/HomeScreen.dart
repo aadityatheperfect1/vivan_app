@@ -96,6 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
               TextButton(
                 child: Text('ACCEPT'),
                 onPressed: () {
+                  usbManager.connectedVehicle?['mac'] = request['mac'];
+                  usbManager.connectedVehicle?['vehicle'] = request['vehicle'];
+                  usbManager.connectedVehicle?['status'] = "Connected";
                   usbManager.sendChatResponse(
                     "Accepted",
                     request['mac'],
