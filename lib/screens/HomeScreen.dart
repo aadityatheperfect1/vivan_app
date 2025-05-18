@@ -16,6 +16,15 @@ class _HomeScreenState extends State<HomeScreen> {
   late StreamSubscription<Map<String, dynamic>> _requestSubscription;
   late StreamSubscription<Map<String, dynamic>> _chatResponseController;
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'OK':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   void initState() {
     // TODO: implement initState
@@ -131,39 +140,98 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Connection status card
           Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            color: Colors.grey[50],
+            margin: EdgeInsets.all(8),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Connection Status:'),
-                      Chip(
-                        label: Text(
-                          usbManager.status,
-                          style: TextStyle(color: Colors.white),
+                      Row(
+                        children: [
+                          Icon(Icons.usb, color: Colors.blueGrey, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'USB Connection',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        backgroundColor:
-                            usbManager.status == "Connected"
-                                ? Colors.green
-                                : Colors.red,
+                        decoration: BoxDecoration(
+                          color:
+                              usbManager.status == "Connected"
+                                  ? Colors.green[100]
+                                  : Colors.red[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                usbManager.status == "Connected"
+                                    ? Colors.green
+                                    : Colors.red,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          usbManager.status,
+                          style: TextStyle(
+                            color:
+                                usbManager.status == "Connected"
+                                    ? Colors.green[800]
+                                    : Colors.red[800],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   if (usbManager.connectedDevice != null) ...[
                     SizedBox(height: 8),
                     Text(
-                      'Connected to: ${usbManager.connectedDevice?.productName}',
+                      usbManager.connectedDevice?.productName ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: usbManager.disconnect,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red, // Changed from 'primary'
-                        foregroundColor: Colors.white, // Optional: text color
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: usbManager.disconnect,
+                        icon: Icon(Icons.power_settings_new, size: 16),
+                        label: Text(
+                          'Disconnect',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: BorderSide(color: Colors.red),
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
-                      child: Text('Disconnect'),
                     ),
                   ],
                 ],
@@ -171,27 +239,46 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child:
-                usbManager.connectedDevice == null
-                    ? _buildDeviceList(usbManager)
-                    : usbManager.connectedVehicle?['status'] == "Connected"
-                    ? ConnectedView()
-                    : Expanded(
-                      child: Column(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child:
+                  usbManager.connectedDevice == null
+                      // 🔌 Show device list when no USB device connected
+                      ? _buildDeviceList(usbManager)
+                      // ✅ Show connected vehicle UI if fully connected
+                      : usbManager.connectedVehicle?['status'] == "Connected"
+                      ? ConnectedView()
+                      // 📡 Show radar + vehicle list if only USB connected
+                      : Column(
                         children: [
-                          Expanded(
-                            child: RadarView(
-                              selfLatitude:
-                                  usbManager.selfVehicleInfo['latitude'],
-                              selfLongitude:
-                                  usbManager.selfVehicleInfo['longitude'],
-                              vehicles: usbManager.vehicleInfo,
+                          // Radar Section
+                          Container(
+                            padding: const EdgeInsets.all(0),
+                            child: SizedBox(
+                              child: RadarView(
+                                selfLatitude:
+                                    usbManager.selfVehicleInfo['latitude'],
+                                selfLongitude:
+                                    usbManager.selfVehicleInfo['longitude'],
+                                vehicles: usbManager.vehicleInfo,
+                              ),
                             ),
                           ),
-                          Expanded(child: _buildVehicleList(usbManager)),
+                          SizedBox(height: 16),
+
+                          // Vehicle List Section
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(0),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade50,
+                              ),
+                              child: _buildVehicleList(usbManager),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+            ),
           ),
         ],
       ),
@@ -231,38 +318,99 @@ class _HomeScreenState extends State<HomeScreen> {
       itemBuilder: (context, index) {
         final vehicle = usbManager.vehicleInfo[index];
         return Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Vehicle ${vehicle['id']}',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                // Vehicle ID and Status Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Vehicle ${vehicle['id']}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.indigo,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 10,
+                          color: _getStatusColor(vehicle['status'] ?? ''),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          vehicle['status'] ?? 'Unknown',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 SizedBox(height: 8),
-                _buildInfoRow('Status:', vehicle['status']),
-                _buildInfoRow('Speed:', '${vehicle['speed']} km/h'),
-                _buildInfoRow(
-                  'Position:',
+
+                // Compact details
+                _infoRow(Icons.speed, '${vehicle['speed']} km/h'),
+                _infoRow(
+                  Icons.location_on,
                   'Lat: ${vehicle['latitude']}, Lon: ${vehicle['longitude']}',
+                  maxLines: 1,
                 ),
-                _buildInfoRow('Last Update:', vehicle['lastReceivedTime']),
+                _infoRow(Icons.access_time, vehicle['lastReceivedTime'] ?? '—'),
                 if (vehicle['mac'] != null)
-                  _buildInfoRow('MAC:', vehicle['mac']),
-                SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    // Implement connection initiation
-                    usbManager.sendChatRequest(vehicle['mac'], vehicle['id']);
-                  },
-                  child: Text('Connect to Vehicle'),
+                  _infoRow(Icons.wifi, vehicle['mac']),
+
+                SizedBox(height: 10),
+
+                // Connect Button
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.indigo,
+                      side: BorderSide(color: Colors.indigo),
+                    ),
+                    icon: Icon(Icons.link),
+                    label: Text('Connect'),
+                    onPressed: () {
+                      usbManager.sendChatRequest(vehicle['mac'], vehicle['id']);
+                    },
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text, {int maxLines = 2}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[700]),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -281,6 +429,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+class _RadarCrossPainter extends CustomPainter {
+  final Color color;
+
+  _RadarCrossPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = color
+          ..strokeWidth = 1;
+
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
 class RadarView extends StatelessWidget {
   final double selfLatitude;
   final double selfLongitude;
@@ -297,30 +473,40 @@ class RadarView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 200,
-        height: 200,
+        width: 300,
+        height: 300,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.grey[200],
-          border: Border.all(color: Colors.indigo, width: 2),
+          gradient: RadialGradient(
+            colors: [Colors.grey.shade100, Colors.grey.shade300],
+            center: Alignment.center,
+            radius: 1.0,
+          ),
+          border: Border.all(color: Colors.indigo.shade400, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.indigo.withOpacity(0.1),
+              blurRadius: 6,
+              spreadRadius: 1,
+              offset: Offset(0, 0),
+            ),
+          ],
         ),
         child: Stack(
           children: [
-            // Radar circles
-            ...List.generate(3, (index) {
-              final radius = (index + 1) * 50.0;
+            // Two radar rings with good spacing
+            ...[60.0, 105.0].map((radius) {
               return Positioned(
-                left: 100 - radius,
-                top: 100 - radius,
+                left: 150 - radius,
+                top: 150 - radius,
                 child: Container(
                   width: radius * 2,
                   height: radius * 2,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.transparent,
                     border: Border.all(
-                      color: Colors.indigo.withOpacity(0.5),
-                      width: 1,
+                      color: Colors.indigo.withOpacity(0.4),
+                      width: 1.5,
                     ),
                   ),
                 ),
@@ -328,17 +514,10 @@ class RadarView extends StatelessWidget {
             }),
 
             // Radar cross lines
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Colors.indigo.withOpacity(0.3),
-                    width: 1,
-                  ),
-                  left: BorderSide(
-                    color: Colors.indigo.withOpacity(0.3),
-                    width: 1,
-                  ),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _RadarCrossPainter(
+                  color: Colors.indigo.withOpacity(0.3),
                 ),
               ),
             ),
@@ -361,60 +540,71 @@ class RadarView extends StatelessWidget {
 
               final distance = calculateHaversine(
                 8.6279986,
-                // selfLat,
                 77.0339556,
-                // selfLon
                 vehicleLat,
                 vehicleLon,
               );
 
               final angle = calculateAngle(
                 8.6279986,
-                // selfLat,
                 77.0339556,
-                // selfLon
                 vehicleLat,
                 vehicleLon,
               );
 
-              // Scale distance to fit in radar (max 150m shown)
-              final scaledDistance = min(distance, 150) / 150 * 100;
-
-              // Convert polar to cartesian coordinates
+              final scaledDistance = min(distance, 150) / 150 * 120;
               final radian = angle * pi / 180;
-              final x = 100 + scaledDistance * cos(radian);
-              final y = 100 + scaledDistance * sin(radian);
+              final x = 150 + scaledDistance * cos(radian);
+              final y = 150 + scaledDistance * sin(radian);
 
               return Positioned(
-                left: x - 8,
-                top: y - 8,
+                left: x - 10,
+                top: y - 10,
                 child: Container(
-                  width: 16,
-                  height: 16,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _getStatusColor(vehicle['status']?.toString() ?? ''),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Center(
                     child: Text(
                       vehicle['id']?.toString().substring(0, 1) ?? '?',
-                      style: TextStyle(color: Colors.white, fontSize: 10),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
               );
             }).toList(),
 
-            // Center indicator (self vehicle)
+            // Center vehicle (self)
             Positioned(
-              left: 95,
-              top: 95,
+              left: 143,
+              top: 143,
               child: Container(
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.indigo,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.indigo.withOpacity(0.6),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -435,7 +625,7 @@ class RadarView extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'connected':
+      case 'OK':
         return Colors.green;
       case 'warning':
         return Colors.orange;
@@ -560,61 +750,104 @@ class _ConnectedViewState extends State<ConnectedView> {
     final usbManager = Provider.of<UsbConnectionManager>(context);
     return Column(
       children: [
+        // Connection Status Card
         Card(
-          margin: EdgeInsets.all(12),
+          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.all(12),
             child: Column(
               children: [
+                // Connection Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'CONNECTED TO',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green[700],
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.green[700],
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'CONNECTED',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ],
                     ),
                     Icon(
-                      Icons.signal_wifi_statusbar_4_bar_rounded,
-                      color: Colors.green,
+                      Icons.signal_wifi_4_bar,
+                      color: Colors.green[700],
+                      size: 24,
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
-                _buildConnectionInfoRow(
-                  'Vehicle:',
-                  usbManager.connectedVehicle?['vehicle'],
+                SizedBox(height: 5),
+
+                // Connection Info - Compact Two Column Layout
+                Table(
+                  columnWidths: const {
+                    0: IntrinsicColumnWidth(),
+                    1: FlexColumnWidth(),
+                  },
+                  children: [
+                    _buildConnectionInfoRow(
+                      'Vehicle: ',
+                      usbManager.connectedVehicle?['vehicle'],
+                    ),
+                    _buildConnectionInfoRow(
+                      'MAC:',
+                      usbManager.connectedVehicle?['mac'],
+                    ),
+                  ],
                 ),
-                _buildConnectionInfoRow(
-                  'MAC Address:',
-                  usbManager.connectedVehicle?['mac'],
-                ),
-                SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _disconnect,
-                  child: Text('DISCONNECT'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    minimumSize: Size(double.infinity, 40),
+                SizedBox(height: 6),
+
+                // Disconnect Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _disconnect,
+                    icon: Icon(Icons.link_off, size: 18),
+                    label: Text('DISCONNECT'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[600],
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ),
+
+        // Chat Area
         Expanded(
           child: Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.grey[50]),
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
             child: Column(
               children: [
                 Expanded(
                   child: ListView.builder(
                     reverse: false,
+                    physics: BouncingScrollPhysics(),
+                    padding: EdgeInsets.only(top: 8),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final message = _messages[index];
@@ -622,8 +855,12 @@ class _ConnectedViewState extends State<ConnectedView> {
                     },
                   ),
                 ),
-                SizedBox(height: 8),
-                _buildMessageInput(),
+
+                // Message Input
+                Padding(
+                  padding: EdgeInsets.only(bottom: 8, top: 4),
+                  child: _buildMessageInput(),
+                ),
               ],
             ),
           ),
@@ -632,25 +869,51 @@ class _ConnectedViewState extends State<ConnectedView> {
     );
   }
 
-  Widget _buildConnectionInfoRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+  // Helper method for connection info rows
+  TableRow _buildConnectionInfoRow(String label, String? value) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(
             label,
             style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
           ),
-          SizedBox(width: 8),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.black87))),
-        ],
-      ),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            value ?? '--',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
     );
   }
+
+  // Widget _buildConnectionInfoRow(String label, String value) {
+  //   return Padding(
+  //     padding: EdgeInsets.symmetric(vertical: 4),
+  //     child: Row(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Text(
+  //           label,
+  //           style: TextStyle(
+  //             fontWeight: FontWeight.bold,
+  //             color: Colors.grey[700],
+  //           ),
+  //         ),
+  //         SizedBox(width: 8),
+  //         Expanded(child: Text(value, style: TextStyle(color: Colors.black87))),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildMessageBubble(Map<String, dynamic> message) {
     final usbManager = Provider.of<UsbConnectionManager>(context);
