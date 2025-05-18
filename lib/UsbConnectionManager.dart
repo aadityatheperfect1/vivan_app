@@ -40,6 +40,18 @@ class UsbConnectionManager {
     'status': 'Disconnected',
   };
 
+  void setConnectedVehicle(Map<String, dynamic> vehicle) {
+    _connectedVehicle['name'] = vehicle['name'];
+    _connectedVehicle['mac'] = vehicle['mac'];
+    _connectedVehicle['status'] = vehicle['status'];
+    // notifyListeners();
+  }
+
+  void setConnectedDevice(UsbDevice device) {
+    _device = device;
+    // notifyListeners();
+  }
+
   final StreamController<String> _statusController =
       StreamController.broadcast();
   final StreamController<List<Map<String, dynamic>>> _vehiclesController =
@@ -238,6 +250,7 @@ class UsbConnectionManager {
       selfVehicle['status'] = 'Connected';
       _statusController.add(_status);
       _selfVehicleController.add(selfVehicle);
+      // notifyListeners();
     } catch (e) {
       _status = "Connection error: ${e.toString()}";
       _statusController.add(_status);
@@ -310,6 +323,7 @@ class UsbConnectionManager {
     selfVehicle['status'] = 'Disconnected';
     _statusController.add(_status);
     _selfVehicleController.add(selfVehicle);
+    // notifyListeners();
   }
 
   void dispose() {
