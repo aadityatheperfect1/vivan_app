@@ -52,6 +52,7 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
   Timer? _recordingTimer;
 
   String _receivedMessage = '';
+  String _oldMessage = '';
 
   bool isDeviceConnected = false;
   bool isVehicleConnected = false;
@@ -184,6 +185,7 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
 
   Future<void> _playMessage() async {
     await flutterTts.speak(_receivedMessage);
+    _oldMessage = _receivedMessage;
   }
 
   void dispose() {
@@ -309,9 +311,11 @@ class _VoicechatscreenState extends State<Voicechatscreen> {
                                 Icons.play_arrow,
                                 color: Colors.black,
                               ),
-                              label: const Text(
-                                'Play Message',
-                                style: TextStyle(
+                              label: Text(
+                                (_receivedMessage == _oldMessage)
+                                    ? 'RePlay'
+                                    : 'Play New Message',
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,

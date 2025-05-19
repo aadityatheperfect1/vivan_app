@@ -360,6 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 // Compact details
                 _infoRow(Icons.speed, '${vehicle['speed']} km/h'),
+                // _infoRow(Icons.straighten, calculateHaversine(se, lon1, lat2, lon2)),
                 _infoRow(
                   Icons.location_on,
                   'Lat: ${vehicle['latitude']}, Lon: ${vehicle['longitude']}',
@@ -525,15 +526,15 @@ class RadarView extends StatelessWidget {
               }
 
               final distance = calculateHaversine(
-                8.6279986,
-                77.0339556,
+                selfLat,
+                selfLon,
                 vehicleLat,
                 vehicleLon,
               );
 
               final angle = calculateAngle(
-                8.6279986,
-                77.0339556,
+                selfLat,
+                selfLon,
                 vehicleLat,
                 vehicleLon,
               );
@@ -562,10 +563,10 @@ class RadarView extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      vehicle['id']?.toString().substring(0, 1) ?? '?',
+                      '${vehicle['id']?.toString().substring(0, 1) ?? '?'}${''}',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
